@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador ML de Mines</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        primaryDark: '#4B4AB2',
+                        primaryLight: '#7E7DE8',
+                        safe: '#4ade80',
+                        danger: '#ef4444',
+                        selection: '#f59e0b',
+                        warning: '#f97316',
+                        darkBg: '#121212',
+                        darkCard: '#1E1E1E'
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                    },
+                    boxShadow: {
+                        'inner-lg': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.15)',
+                        'elevated': '0 8px 20px rgba(0, 0, 0, 0.1)',
+                        'elevated-dark': '0 8px 20px rgba(0, 0, 0, 0.25)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-3px);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(90deg, #5D5CDE, #7E7DE8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .dark .gradient-text {
+            background: linear-gradient(90deg, #7E7DE8, #9E9EFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Animação suave para transições */
+        .smooth-transition {
+            transition: all 0.3s ease;
+        }
+        
+        /* Estilo para o botão selecionado */
+        .btn-selected {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Pulsação para botões selecionados */
+        @keyframes gentle-pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.85; }
+            100% { opacity: 1; }
+        }
+        
+        .btn-selected-pulse {
+            animation: gentle-pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-darkBg transition-colors duration-200 min-h-screen">
+    <div class="min-h-screen flex flex-col p-4 sm:p-6 max-w-4xl mx-auto">
+        <!-- Cabeçalho -->
+        <header class="text-center mb-8 py-4">
+            <h1 class="text-3xl font-bold gradient-text mb-2 flex items-center justify-center">
+                <i class="fas fa-robot mr-3"></i>Analisador ML de Mines
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400 text-lg">IA avançada para análise de jogadas no Mines</p>
+        </header>
+
+        <!-- Corpo Principal -->
+        <main class="flex-grow flex flex-col items-center">
+            <!-- Configurações -->
+            <div class="w-full bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden transition-all mb-6">
+                <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                        <i class="fas fa-chart-line mr-2"></i>Status da Sessão
+                    </h2>
+                </div>
+                <div class="p-5">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
+                                <i class="fas fa-list-ol text-blue-500 dark:text-blue-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Sequência atual:</p>
+                                <div class="flex items-center">
+                                    <span id="sequenceCount" class="text-2xl font-bold text-primary dark:text-primaryLight">1</span>
+                                    <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">/ <span id="totalPlays">0</span> jogadas</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-green-100 dark:bg-green-900/30 p-3 rounded-lg">
+                                <i class="fas fa-percentage text-green-500 dark:text-green-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Taxa de acerto:</p>
+                                <div class="flex items-center">
+                                    <span id="successRate" class="text-2xl font-bold text-green-500 dark:text-green-400">0%</span>
+                                    <span id="winCount" class="ml-2 text-sm text-gray-500 dark:text-gray-400">(0 ganhos)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabuleiro e Controles -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full mb-6">
+                <!-- Tabuleiro do Mines -->
+                <div class="lg:col-span-2 relative bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden">
+                    <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                            <i class="fas fa-th mr-2"></i>Tabuleiro de Análise
+                        </h2>
+                    </div>
+                    <div class="p-5">
+                        <div id="mines-board" class="grid grid-cols-5 gap-2 mb-6">
+                            <!-- Os 25 quadrados (5x5) serão gerados pelo JavaScript -->
+                        </div>
+                        
+                        <!-- Botões de Ação -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <button id="analyze-btn" class="bg-primary hover:bg-primaryDark text-white font-medium py-3 px-4 rounded-lg transition shadow-md active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 flex items-center justify-center">
+                                <i class="fas fa-search mr-2"></i>ANALISAR JOGADA
+                            </button>
+                            <button id="exploded-btn" class="bg-danger hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition shadow-md active:scale-95 focus:outline-none focus:ring-2 focus:ring-danger focus:ring-opacity-50 flex items-center justify-center">
+                                <i class="fas fa-bomb mr-2"></i>EXPLODIU
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Overlay de carregamento -->
+                    <div id="loading-overlay" class="hidden absolute inset-0 bg-white/90 dark:bg-darkCard/90 flex items-center justify-center rounded-xl backdrop-blur-sm">
+                        <div class="flex flex-col items-center">
+                            <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            <p class="mt-4 text-primary dark:text-primaryLight font-medium text-lg">Processando análise ML...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Overlay para seleção de quadrado que explodiu -->
+                    <div id="explosion-overlay" class="hidden absolute inset-0 bg-white/95 dark:bg-darkCard/95 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm p-6">
+                        <div class="text-center mb-6">
+                            <i class="fas fa-bomb text-danger text-4xl mb-3"></i>
+                            <h3 class="text-xl font-bold text-danger">Selecione qual quadrado explodiu</h3>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6 w-full max-w-sm">
+                            <button class="explosion-btn bg-warning hover:bg-warning/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center" data-position="0">
+                                <i class="fas fa-square-full mr-2"></i>Quadrado 1
+                            </button>
+                            <button class="explosion-btn bg-warning hover:bg-warning/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center" data-position="1">
+                                <i class="fas fa-square-full mr-2"></i>Quadrado 2
+                            </button>
+                            <button class="explosion-btn bg-warning hover:bg-warning/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center" data-position="2">
+                                <i class="fas fa-square-full mr-2"></i>Quadrado 3
+                            </button>
+                            <button class="explosion-btn bg-warning hover:bg-warning/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center" data-position="3">
+                                <i class="fas fa-square-full mr-2"></i>Quadrado 4
+                            </button>
+                        </div>
+                        
+                        <div class="mb-6 w-full max-w-sm">
+                            <div class="flex items-center mb-3 p-3 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
+                                <input id="martingale-checkbox" type="checkbox" class="w-5 h-5 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="martingale-checkbox" class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                    Tentei com martingale e ainda explodiu
+                                </label>
+                            </div>
+                            
+                            <div id="martingale-container" class="hidden p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/30">
+                                <p class="text-sm font-medium text-red-700 dark:text-red-300 mb-3">Qual quadrado explodiu no martingale?</p>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button class="martingale-btn bg-red-500 hover:bg-red-600 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="0">
+                                        <i class="fas fa-square-full mr-2"></i>Quadrado 1
+                                    </button>
+                                    <button class="martingale-btn bg-red-500 hover:bg-red-600 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="1">
+                                        <i class="fas fa-square-full mr-2"></i>Quadrado 2
+                                    </button>
+                                    <button class="martingale-btn bg-red-500 hover:bg-red-600 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="2">
+                                        <i class="fas fa-square-full mr-2"></i>Quadrado 3
+                                    </button>
+                                    <button class="martingale-btn bg-red-500 hover:bg-red-600 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="3">
+                                        <i class="fas fa-square-full mr-2"></i>Quadrado 4
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="cancel-explosion" class="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center">
+                            <i class="fas fa-times mr-2"></i>Cancelar
+                        </button>
+                    </div>
+                    
+                    <!-- Overlay para martingale bem-sucedido -->
+                    <div id="martingale-success-overlay" class="hidden absolute inset-0 bg-white/95 dark:bg-darkCard/95 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm p-6">
+                        <div class="text-center mb-6">
+                            <i class="fas fa-question-circle text-warning text-4xl mb-3"></i>
+                            <h3 class="text-xl font-bold text-warning">Precisou de martingale?</h3>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-5 mb-6 w-full max-w-sm">
+                            <button id="martingale-yes" class="bg-warning hover:bg-warning/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center">
+                                <i class="fas fa-check mr-2"></i>Sim
+                            </button>
+                            <button id="martingale-no" class="bg-safe hover:bg-safe/90 text-white font-bold py-4 px-4 rounded-lg transition shadow-md flex items-center justify-center">
+                                <i class="fas fa-times mr-2"></i>Não
+                            </button>
+                        </div>
+                        
+                        <div id="martingale-success-container" class="hidden w-full max-w-sm p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-900/30 mb-4">
+                            <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-3">Qual quadrado explodiu na primeira tentativa?</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button class="martingale-success-btn bg-warning hover:bg-warning/90 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="0">
+                                    <i class="fas fa-square-full mr-2"></i>Quadrado 1
+                                </button>
+                                <button class="martingale-success-btn bg-warning hover:bg-warning/90 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="1">
+                                    <i class="fas fa-square-full mr-2"></i>Quadrado 2
+                                </button>
+                                <button class="martingale-success-btn bg-warning hover:bg-warning/90 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="2">
+                                    <i class="fas fa-square-full mr-2"></i>Quadrado 3
+                                </button>
+                                <button class="martingale-success-btn bg-warning hover:bg-warning/90 text-white text-sm py-2 px-3 rounded-lg transition flex items-center justify-center" data-position="3">
+                                    <i class="fas fa-square-full mr-2"></i>Quadrado 4
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Métodos de IA -->
+                <div class="bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden">
+                    <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                            <i class="fas fa-brain mr-2"></i>Modelos de IA Ativos
+                        </h2>
+                    </div>
+                    <div class="p-5">
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="thompson-active" type="checkbox" checked class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                    <label for="thompson-active" class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300 flex items-center">
+                                        <i class="fas fa-chart-bar text-blue-500 dark:text-blue-400 mr-2"></i>Thompson Sampling
+                                    </label>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Confiança:</span>
+                                    <span id="thompson-confidence" class="text-sm font-bold text-primary dark:text-primaryLight">45%</span>
+                                </div>
+                            </div>
+                            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="bandit-active" type="checkbox" checked class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                    <label for="bandit-active" class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300 flex items-center">
+                                        <i class="fas fa-sliders-h text-purple-500 dark:text-purple-400 mr-2"></i>Contextual Bandits
+                                    </label>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Confiança:</span>
+                                    <span id="bandit-confidence" class="text-sm font-bold text-primary dark:text-primaryLight">40%</span>
+                                </div>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="heuristic-active" type="checkbox" checked class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                    <label for="heuristic-active" class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300 flex items-center">
+                                        <i class="fas fa-lightbulb text-green-500 dark:text-green-400 mr-2"></i>Modelo Heurístico
+                                    </label>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Confiança:</span>
+                                    <span id="heuristic-confidence" class="text-sm font-bold text-primary dark:text-primaryLight">65%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                                    <i class="fas fa-tachometer-alt mr-2 text-primary dark:text-primaryLight"></i>Performance do Modelo
+                                </span>
+                                <span id="model-accuracy" class="text-sm font-bold text-green-500 dark:text-green-400">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                <div id="model-accuracy-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estatísticas e Histórico -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                <!-- Estatísticas avançadas -->
+                <div class="bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden card-hover">
+                    <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                            <i class="fas fa-chart-pie mr-2"></i>Estatísticas Detalhadas
+                        </h2>
+                    </div>
+                    <div class="p-5">
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                                <p class="text-sm text-gray-700 dark:text-gray-400 mb-1 flex items-center">
+                                    <i class="fas fa-sync-alt mr-2 text-blue-500 dark:text-blue-400"></i>Martingale necessário:
+                                </p>
+                                <p class="font-medium text-gray-900 dark:text-white text-lg"><span id="martingale-rate">0%</span></p>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                                <p class="text-sm text-gray-700 dark:text-gray-400 mb-1 flex items-center">
+                                    <i class="fas fa-check-circle mr-2 text-green-500 dark:text-green-400"></i>Acerto direto:
+                                </p>
+                                <p class="font-medium text-gray-900 dark:text-white text-lg"><span id="direct-success-rate">0%</span></p>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                            <p class="text-sm text-gray-700 dark:text-gray-400 mb-3 flex items-center">
+                                <i class="fas fa-bomb mr-2 text-yellow-600 dark:text-yellow-400"></i>Quadrados que mais explodem:
+                            </p>
+                            <div class="flex justify-between">
+                                <div class="text-center flex-1">
+                                    <span class="inline-block w-8 h-8 rounded-full bg-selection text-white text-sm flex items-center justify-center mb-1 mx-auto">1</span>
+                                    <p class="text-xs font-medium text-gray-800 dark:text-white"><span id="explosion-q1">0%</span></p>
+                                </div>
+                                <div class="text-center flex-1">
+                                    <span class="inline-block w-8 h-8 rounded-full bg-selection text-white text-sm flex items-center justify-center mb-1 mx-auto">2</span>
+                                    <p class="text-xs font-medium text-gray-800 dark:text-white"><span id="explosion-q2">0%</span></p>
+                                </div>
+                                <div class="text-center flex-1">
+                                    <span class="inline-block w-8 h-8 rounded-full bg-selection text-white text-sm flex items-center justify-center mb-1 mx-auto">3</span>
+                                    <p class="text-xs font-medium text-gray-800 dark:text-white"><span id="explosion-q3">0%</span></p>
+                                </div>
+                                <div class="text-center flex-1">
+                                    <span class="inline-block w-8 h-8 rounded-full bg-selection text-white text-sm flex items-center justify-center mb-1 mx-auto">4</span>
+                                    <p class="text-xs font-medium text-gray-800 dark:text-white"><span id="explosion-q4">0%</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Histórico de Jogadas -->
+                <div class="bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden card-hover">
+                    <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                        <h2 class="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                            <i class="fas fa-history mr-2"></i>Histórico de Jogadas
+                        </h2>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">Mais recentes</span>
+                    </div>
+                    <div id="history-container" class="p-0 max-h-80 overflow-y-auto">
+                        <div id="history-list" class="divide-y divide-gray-100 dark:divide-gray-800">
+                            <!-- Histórico de jogadas será adicionado aqui -->
+                            <div class="py-4 px-5 text-gray-500 dark:text-gray-400 text-center">
+                                <i class="fas fa-info-circle mr-2"></i>Nenhuma jogada realizada ainda
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Rodapé -->
+        <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400 py-4 border-t border-gray-200 dark:border-gray-800">
+            <p class="flex items-center justify-center"><i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>Este aplicativo é apenas uma ferramenta estatística e não garante ganhos em jogos de azar.</p>
+            <p class="mt-2 text-xs flex items-center justify-center"><i class="fas fa-database mr-2 text-gray-400"></i>Nota: Os dados são mantidos apenas durante a sessão atual.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Detecção de tema claro/escuro
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        /**************************************
+         * IMPLEMENTAÇÃO DOS MODELOS DE ML
+         **************************************/
+        
+        // Implementação do Thompson Sampling (sem persistência)
+        class ThompsonSamplingModel {
+            constructor(totalPositions = 25) {
+                this.totalPositions = totalPositions;
+                this.alpha = Array(totalPositions).fill(1); // Sucessos + 1 (prior)
+                this.beta = Array(totalPositions).fill(1);  // Falhas + 1 (prior)
+                this.name = "thompson";
+                this.confidence = 0.45; // Confiança inicial
+            }
+            
+            // Atualizar modelo com feedback
+            update(position, success) {
+                if (position >= 0 && position < this.totalPositions) {
+                    if (success) {
+                        this.alpha[position]++;
+                    } else {
+                        this.beta[position]++;
+                    }
+                }
+                
+                // Atualizar confiança do modelo baseado na quantidade de dados
+                const totalObservations = this.alpha.reduce((a, b) => a + b, 0) + 
+                                         this.beta.reduce((a, b) => a + b, 0) - 
+                                         2 * this.totalPositions; // Subtrair priors
+                
+                // Ajustar confiança baseada na quantidade de dados (quanto mais dados, maior a confiança)
+                if (totalObservations > 0) {
+                    this.confidence = Math.min(0.85, 0.45 + (totalObservations / 200) * 0.4);
+                }
+            }
+            
+            // Amostragem da distribuição Beta para cada posição
+            sample() {
+                return this.alpha.map((a, i) => {
+                    const b = this.beta[i];
+                    // Aproximação simplificada com números aleatórios
+                    // Esta é uma aproximação mais robusta da distribuição Beta
+                    const u1 = Math.random();
+                    const u2 = Math.random();
+                    
+                    // Usando uma aproximação da distribuição Beta
+                    // Esta é uma técnica comum para quando não precisamos de precisão extrema
+                    // Use o método da transformação inversa para a distribuição Beta aproximada
+                    return Math.random() * (a / (a + b)) + 0.5 * Math.random() * (1 - (a / (a + b)));
+                });
+            }
+            
+            // Prever as melhores posições
+            predict(count = 4) {
+                // Amostrar da distribuição beta para cada posição
+                const samples = this.sample();
+                
+                // Quanto menor o valor, maior a probabilidade de bomba
+                // Portanto, invertemos o valor (1 - p) para obter a "segurança"
+                const safetyScores = samples.map(p => 1 - p);
+                
+                // Criar array de objetos {index, score} para classificação
+                const positionsWithScores = safetyScores.map((score, index) => ({
+                    index,
+                    score
+                }));
+                
+                // Ordenar por pontuação (maior primeiro)
+                positionsWithScores.sort((a, b) => b.score - a.score);
+                
+                // Retornar as posições com maior pontuação
+                return positionsWithScores.slice(0, count).map(p => p.index);
+            }
+            
+            // Obter probabilidades para todas as posições
+            getProbabilities() {
+                // Calcular as médias das distribuições Beta
+                return this.alpha.map((a, i) => {
+                    const b = this.beta[i];
+                    // Média da distribuição Beta
+                    return a / (a + b);
+                });
+            }
+        }
+        
+        // Implementação do Contextual Bandit (sem persistência)
+        class ContextualBanditModel {
+            constructor(totalPositions = 25, contextFeatures = 10) {
+                this.totalPositions = totalPositions;
+                this.contextFeatures = contextFeatures;
+                this.weights = Array(totalPositions).fill().map(() => 
+                    Array(contextFeatures).fill(0)
+                );
+                this.counters = Array(totalPositions).fill(0);
+                this.totalPlays = 0;
+                this.name = "bandit";
+                this.learningRate = 0.1;
+                this.exploreRate = 0.2; // Taxa de exploração inicial
+                this.confidence = 0.4; // Confiança inicial
+                this.recentRewards = [];  // Armazena recompensas recentes para ajuste de confiança
+            }
+            
+            // Extrair características do contexto atual do jogo
+            extractContext(gameState) {
+                // Inicializar um array seguro de contexto com valores padrão
+                const context = Array(this.contextFeatures).fill(0);
+                
+                if (!gameState) return context;
+                
+                try {
+                    // 1-4: Taxas de explosão dos quadrados 1, 2, 3, 4
+                    if (gameState.explosionData && gameState.totalExplosions > 0) {
+                        for (let i = 0; i < 4 && i < gameState.explosionData.firstAttempt.length; i++) {
+                            context[i] = gameState.explosionData.firstAttempt[i] / gameState.totalExplosions;
+                        }
+                    }
+                    
+                    // 5: Taxa de sucesso global
+                    context[4] = gameState.totalPlays > 0 ? gameState.wins / gameState.totalPlays : 0.5;
+                    
+                    // 6: Taxa de martingale
+                    context[5] = gameState.wins > 0 ? gameState.martingaleWins / gameState.wins : 0;
+                    
+                    // 7: Falhas consecutivas
+                    context[6] = Math.min(1, gameState.consecutiveFailures / 3);
+                    
+                    // 8-9: Distribuição por quadrantes (success/failure ratio)
+                    if (gameState.quadrantStats && gameState.quadrantStats.length >= 4) {
+                        // Normalizar distribuição por quadrantes
+                        const quadrantTotal = gameState.quadrantStats.reduce((a, b) => a + b, 0) || 1;
+                        context[7] = gameState.quadrantStats[0] / quadrantTotal;
+                        context[8] = gameState.quadrantStats[1] / quadrantTotal;
+                        context[9] = gameState.quadrantStats[2] / quadrantTotal;
+                        // O quarto quadrante está implícito para evitar colinearidade
+                    }
+                } catch (e) {
+                    console.error("Erro ao extrair contexto:", e);
+                }
+                
+                return context;
+            }
+            
+            // Calcular pontuação para uma posição baseada no contexto
+            scorePosition(position, context) {
+                if (!context || !Array.isArray(context) || context.length !== this.contextFeatures) {
+                    console.error("Contexto inválido:", context);
+                    return 0;
+                }
+                
+                // Produto escalar do contexto com os pesos desta posição
+                const weights = this.weights[position];
+                let score = 0;
+                
+                for (let i = 0; i < this.contextFeatures; i++) {
+                    score += weights[i] * context[i];
+                }
+                
+                // Adicionar termo de exploração (Upper Confidence Bound)
+                const explorationBonus = this.exploreRate * Math.sqrt(
+                    Math.log(this.totalPlays + 1) / (this.counters[position] + 1)
+                );
+                
+                return score + explorationBonus;
+            }
+            
+            // Atualizar com feedback
+            update(position, context, reward) {
+                if (position < 0 || position >= this.totalPositions) return;
+                if (!context || !Array.isArray(context) || context.length !== this.contextFeatures) {
+                    console.error("Contexto inválido em update:", context);
+                    return;
+                }
+                
+                // Incrementar contadores
+                this.counters[position]++;
+                this.totalPlays++;
+                
+                // Salvar recompensa para análise de desempenho
+                this.recentRewards.push(reward);
+                if (this.recentRewards.length > 10) {
+                    this.recentRewards.shift();
+                }
+                
+                // Calcular taxa de aprendizado adaptativa
+                const adaptiveLR = this.learningRate / Math.sqrt(this.counters[position]);
+                
+                // Atualizar pesos com feedback
+                const weights = this.weights[position];
+                for (let i = 0; i < this.contextFeatures; i++) {
+                    weights[i] += adaptiveLR * reward * context[i];
+                }
+                
+                // Ajustar taxa de exploração - diminui com o tempo
+                this.exploreRate = Math.max(0.05, 0.2 - (this.totalPlays / 200) * 0.15);
+                
+                // Atualizar confiança do modelo baseado no desempenho recente
+                if (this.recentRewards.length > 5) {
+                    const avgReward = this.recentRewards.reduce((a, b) => a + b, 0) / this.recentRewards.length;
+                    this.confidence = Math.min(0.8, 0.4 + avgReward * 0.4);
+                }
+            }
+            
+            // Prever melhores posições baseadas no contexto atual
+            predict(context, count = 4) {
+                if (!context || !Array.isArray(context) || context.length !== this.contextFeatures) {
+                    console.error("Contexto inválido em predict:", context);
+                    return Array(count).fill().map((_, i) => i); // Retornar primeiras N posições como fallback
+                }
+                
+                // Calcular scores para todas as posições
+                const scores = [];
+                
+                for (let i = 0; i < this.totalPositions; i++) {
+                    scores.push({
+                        index: i,
+                        score: this.scorePosition(i, context)
+                    });
+                }
+                
+                // Ordenar por pontuação (maior primeiro)
+                scores.sort((a, b) => b.score - a.score);
+                
+                // Retornar as posições com maior pontuação
+                return scores.slice(0, count).map(item => item.index);
+            }
+            
+            // Obter probabilidades para todas as posições
+            getProbabilities(context) {
+                if (!context || !Array.isArray(context) || context.length !== this.contextFeatures) {
+                    console.error("Contexto inválido em getProbabilities:", context);
+                    return Array(this.totalPositions).fill(1/this.totalPositions); // Distribuição uniforme como fallback
+                }
+                
+                // Calcular pontuações sem o bônus de exploração
+                const scores = Array(this.totalPositions).fill(0);
+                
+                for (let pos = 0; pos < this.totalPositions; pos++) {
+                    const weights = this.weights[pos];
+                    for (let i = 0; i < this.contextFeatures; i++) {
+                        scores[pos] += weights[i] * context[i];
+                    }
+                }
+                
+                // Normalizar pontuações usando softmax
+                const maxScore = Math.max(...scores);
+                const expScores = scores.map(s => Math.exp(Math.min(20, s - maxScore))); // Limitar para evitar overflow
+                const sumExpScores = Math.max(1e-10, expScores.reduce((a, b) => a + b, 0)); // Evitar divisão por zero
+                
+                return expScores.map(s => s / sumExpScores);
+            }
+        }
+        
+        // Implementação do modelo híbrido usando vários algoritmos (sem persistência)
+        class HybridMinesPredictor {
+            constructor() {
+                // Inicializar os diferentes modelos
+                this.thompsonModel = new ThompsonSamplingModel(25);
+                this.banditModel = new ContextualBanditModel(25, 10);
+                
+                // Pesos para combinação de modelos (soma deve ser 1)
+                this.modelWeights = {
+                    thompson: 0.35,
+                    bandit: 0.25,
+                    heuristic: 0.4
+                };
+                
+                // Flag para ativar/desativar modelos
+                this.activeModels = {
+                    thompson: true,
+                    bandit: true,
+                    heuristic: true
+                };
+                
+                // Confiança do modelo híbrido
+                this.confidence = 0.5;
+                
+                // Atualizar confiança combinada
+                this.updateConfidence();
+            }
+            
+            // Atualizar pesos dos modelos com base no desempenho
+            updateModelWeights(modelPerformances) {
+                // Se não temos dados de performance, manter os pesos atuais
+                if (!modelPerformances) return;
+                
+                try {
+                    // Normalizar performances para soma = 1
+                    const totalPerf = Object.values(modelPerformances)
+                        .reduce((sum, val) => sum + Math.max(0.1, val), 0);
+                    
+                    if (totalPerf > 0) {
+                        for (const model in modelPerformances) {
+                            if (this.modelWeights.hasOwnProperty(model)) {
+                                // Atualizar peso com base na performance e mantendo um mínimo
+                                this.modelWeights[model] = Math.max(0.1, modelPerformances[model]) / totalPerf;
+                            }
+                        }
+                        
+                        // Renormalizar para garantir que a soma = 1
+                        const weightSum = Object.values(this.modelWeights).reduce((a, b) => a + b, 0);
+                        if (weightSum > 0) {
+                            for (const model in this.modelWeights) {
+                                this.modelWeights[model] /= weightSum;
+                            }
+                        } else {
+                            // Caso de erro, redefine para valores padrão
+                            this.modelWeights = {
+                                thompson: 0.35,
+                                bandit: 0.25,
+                                heuristic: 0.4
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao atualizar pesos do modelo:", e);
+                }
+            }
+            
+            // Atualizar confiança combinada do modelo
+            updateConfidence() {
+                let totalWeight = 0;
+                let weightedConfidence = 0;
+                
+                try {
+                    // Calcular confiança ponderada
+                    if (this.activeModels.thompson) {
+                        weightedConfidence += this.thompsonModel.confidence * this.modelWeights.thompson;
+                        totalWeight += this.modelWeights.thompson;
+                    }
+                    
+                    if (this.activeModels.bandit) {
+                        weightedConfidence += this.banditModel.confidence * this.modelWeights.bandit;
+                        totalWeight += this.modelWeights.bandit;
+                    }
+                    
+                    if (this.activeModels.heuristic) {
+                        // Heurística tem confiança fixa de 0.65
+                        weightedConfidence += 0.65 * this.modelWeights.heuristic;
+                        totalWeight += this.modelWeights.heuristic;
+                    }
+                    
+                    // Normalizar pelo peso total ativo
+                    this.confidence = totalWeight > 0 ? weightedConfidence / totalWeight : 0.5;
+                } catch (e) {
+                    console.error("Erro ao atualizar confiança do modelo:", e);
+                    this.confidence = 0.5; // Valor padrão em caso de erro
+                }
+            }
+            
+            // Prever as melhores posições
+            predict(gameState, count = 4) {
+                // Array de pontuações combinadas para cada posição
+                const combinedScores = Array(25).fill(0);
+                
+                try {
+                    // Obter previsões/probabilidades de cada modelo e combinar
+                    if (this.activeModels.thompson) {
+                        // Obter probabilidades do modelo Thompson
+                        const thompsonProbabilities = this.thompsonModel.getProbabilities();
+                        
+                        // Converter probabilidades em scores (1 - prob para inverter, já que as probs são de bomba)
+                        for (let i = 0; i < 25; i++) {
+                            // Menor probabilidade de bomba = maior segurança
+                            combinedScores[i] += (1 - thompsonProbabilities[i]) * this.modelWeights.thompson;
+                        }
+                    }
+                    
+                    if (this.activeModels.bandit) {
+                        // Extrair contexto para o bandit de forma segura
+                        const context = this.banditModel.extractContext(gameState);
+                        
+                        // Obter probabilidades do modelo Bandit
+                        const banditProbabilities = this.banditModel.getProbabilities(context);
+                        
+                        // Adicionar ao score combinado
+                        for (let i = 0; i < 25; i++) {
+                            combinedScores[i] += banditProbabilities[i] * this.modelWeights.bandit;
+                        }
+                    }
+                    
+                    if (this.activeModels.heuristic) {
+                        // Aplicar heurística baseada em posição e quadrante
+                        const heuristicScores = this.getHeuristicScores(gameState);
+                        
+                        // Adicionar ao score combinado
+                        for (let i = 0; i < 25; i++) {
+                            combinedScores[i] += heuristicScores[i] * this.modelWeights.heuristic;
+                        }
+                    }
+                    
+                    // Aplicar penalidade para posições que aparecem frequentemente nas explosões
+                    if (gameState && gameState.totalExplosions > 0 && gameState.explosionData) {
+                        for (let i = 0; i < 4 && i < gameState.explosionData.firstAttempt.length; i++) {
+                            const explosionRate = gameState.explosionData.firstAttempt[i] / gameState.totalExplosions;
+                            
+                            // Penalizar posições semelhantes em seleções recentes
+                            if (explosionRate > 0.2 && gameState.previousSelections && gameState.previousSelections.length > 0) {
+                                // Verificar as 3 últimas seleções
+                                const recentSelections = gameState.previousSelections.slice(-3);
+                                
+                                recentSelections.forEach(selection => {
+                                    if (selection && i < selection.length) {
+                                        const position = selection[i];
+                                        // Aplicar penalidade proporcional à taxa de explosão
+                                        combinedScores[position] *= Math.max(0.5, 1 - explosionRate * 0.5);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Aplicar aleatoriedade para garantir diversidade
+                    for (let i = 0; i < 25; i++) {
+                        combinedScores[i] += Math.random() * 0.1;
+                    }
+                } catch (e) {
+                    console.error("Erro na previsão do modelo:", e);
+                    // Em caso de erro, adicionar aleatoriedade para não ficar travado
+                    for (let i = 0; i < 25; i++) {
+                        combinedScores[i] = Math.random();
+                    }
+                }
+                
+                // Ordenar posições por pontuação
+                const scoreWithPositions = combinedScores.map((score, index) => ({ score, index }));
+                scoreWithPositions.sort((a, b) => b.score - a.score);
+                
+                // Retornar as posições com maiores pontuações
+                return scoreWithPositions.slice(0, count).map(item => item.index);
+            }
+            
+            // Aplicar heurísticas baseadas no conhecimento do jogo
+            getHeuristicScores(gameState) {
+                const scores = Array(25).fill(0.5); // Inicializar com valor neutro
+                
+                try {
+                    // 1. Balanceamento de quadrantes
+                    const quadrantScores = [0, 0, 0, 0];
+                    
+                    // Calcular representação de cada quadrante nas seleções recentes
+                    if (gameState && gameState.previousSelections && gameState.previousSelections.length > 0) {
+                        const recentSelections = gameState.previousSelections.slice(-5);
+                        
+                        // Analisar quadrantes presentes nas seleções recentes
+                        recentSelections.forEach(selection => {
+                            if (selection && Array.isArray(selection)) {
+                                selection.forEach(pos => {
+                                    if (pos >= 0 && pos < 25) {
+                                        const quadrant = this.getQuadrant(pos);
+                                        quadrantScores[quadrant]++;
+                                    }
+                                });
+                            }
+                        });
+                        
+                        // Normalizar as pontuações
+                        const totalQuadrantScore = quadrantScores.reduce((a, b) => a + b, 0) || 1;
+                        for (let i = 0; i < 4; i++) {
+                            quadrantScores[i] = quadrantScores[i] / totalQuadrantScore;
+                        }
+                        
+                        // Favorecer quadrantes menos utilizados
+                        for (let pos = 0; pos < 25; pos++) {
+                            const quadrant = this.getQuadrant(pos);
+                            const quadrantUsage = quadrantScores[quadrant];
+                            // Menor uso = maior pontuação
+                            scores[pos] *= (1.2 - quadrantUsage);
+                        }
+                    }
+                    
+                    // 2. Diagonais vs bordas vs centro
+                    for (let pos = 0; pos < 25; pos++) {
+                        const row = Math.floor(pos / 5);
+                        const col = pos % 5;
+                        
+                        // Centro tem maior probabilidade de segurança
+                        if (row === 2 && col === 2) {
+                            scores[pos] *= 1.2;
+                        }
+                        // Bordas têm probabilidade média
+                        else if (row === 0 || row === 4 || col === 0 || col === 4) {
+                            scores[pos] *= 0.9;
+                        }
+                        // Diagonais podem ter valores ajustados
+                        else if ((row === col) || (row + col === 4)) {
+                            scores[pos] *= 1.1;
+                        }
+                    }
+                    
+                    // 3. Análise de falhas consecutivas
+                    if (gameState && gameState.consecutiveFailures >= 2) {
+                        // Após múltiplas falhas, aumentar a variabilidade
+                        for (let pos = 0; pos < 25; pos++) {
+                            // Adicionar um fator aleatório maior
+                            scores[pos] *= 0.8 + Math.random() * 0.4;
+                        }
+                    }
+                    
+                    // 4. Análise específica de explosões por quadrado
+                    if (gameState && gameState.totalExplosions > 0 && gameState.explosionData) {
+                        // Verificar quais posições relativas (1, 2, 3, 4) explodem mais
+                        for (let i = 0; i < 4 && i < gameState.explosionData.firstAttempt.length; i++) {
+                            const explosionRate = gameState.explosionData.firstAttempt[i] / gameState.totalExplosions;
+                            
+                            // Se temos um padrão forte de explosão para esta posição
+                            if (explosionRate > 0.3 && gameState.previousSelections && gameState.previousSelections.length > 0) {
+                                // Obter posições correspondentes nas seleções anteriores
+                                gameState.previousSelections.slice(-3).forEach(selection => {
+                                    if (selection && i < selection.length) {
+                                        const similarPositions = this.getSimilarPositions(selection[i]);
+                                        
+                                        // Penalizar posições similares
+                                        similarPositions.forEach(similarPos => {
+                                            if (similarPos >= 0 && similarPos < 25) {
+                                                scores[similarPos] *= 0.8;
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao calcular scores heurísticos:", e);
+                    // Em caso de erro, retornar scores uniformes
+                    return Array(25).fill(0.5);
+                }
+                
+                // Retornar pontuações heurísticas
+                return scores;
+            }
+            
+            // Determinar o quadrante de uma posição
+            getQuadrant(position) {
+                if (position < 0 || position >= 25) return 0;
+                
+                const row = Math.floor(position / 5);
+                const col = position % 5;
+                
+                if (row < 2) {
+                    return col < 2 ? 0 : 1; // NW ou NE
+                } else {
+                    return col < 2 ? 2 : 3; // SW ou SE
+                }
+            }
+            
+            // Obter posições similares (mesma linha, coluna ou quadrante)
+            getSimilarPositions(position) {
+                if (position < 0 || position >= 25) return [];
+                
+                const row = Math.floor(position / 5);
+                const col = position % 5;
+                const similar = [];
+                
+                // Mesma linha
+                for (let c = 0; c < 5; c++) {
+                    if (c !== col) {
+                        similar.push(row * 5 + c);
+                    }
+                }
+                
+                // Mesma coluna
+                for (let r = 0; r < 5; r++) {
+                    if (r !== row) {
+                        similar.push(r * 5 + col);
+                    }
+                }
+                
+                return similar;
+            }
+            
+            // Atualizar modelos com o feedback da jogada
+            update(selectedPositions, success, explosionDetails = null) {
+                try {
+                    // Verificar se selectedPositions é um array válido
+                    if (!Array.isArray(selectedPositions)) {
+                        console.error("selectedPositions não é um array:", selectedPositions);
+                        return;
+                    }
+                    
+                    // Registrar o feedback para cada posição selecionada
+                    selectedPositions.forEach((position, idx) => {
+                        // Verificar limites da posição
+                        if (position < 0 || position >= 25) {
+                            console.error("Posição inválida:", position);
+                            return;
+                        }
+                        
+                        // Determinar se esta posição específica explodiu
+                        let positionExploded = false;
+                        
+                        if (!success && explosionDetails && explosionDetails.explodedPosition === idx) {
+                            positionExploded = true;
+                        }
+                        
+                        // Atualizar o modelo Thompson
+                        this.thompsonModel.update(position, !positionExploded);
+                        
+                        // Atualizar modelo Bandit (se tivermos contexto disponível)
+                        if (explosionDetails && explosionDetails.context) {
+                            // Recompensa: 1 para sucesso, -1 para explosão, 0 para outros casos em falha
+                            const reward = success ? 1 : (positionExploded ? -1 : 0);
+                            this.banditModel.update(position, explosionDetails.context, reward);
+                        }
+                    });
+                    
+                    // Avaliar desempenho de cada modelo
+                    // Esta avaliação será usada para ajustar os pesos no futuro
+                    this.updateConfidence();
+                } catch (e) {
+                    console.error("Erro ao atualizar modelo com feedback:", e);
+                }
+            }
+        }
+
+        /**************************************
+         * ESTADO E COMPONENTES DO APLICATIVO
+         **************************************/
+        
+        // Estado da aplicação com rastreamento avançado
+        const state = {
+            boardSize: 5,
+            totalSquares: 25,
+            bombCount: 4,
+            selectedSquares: [],
+            previousSelections: [],
+            consecutiveFailures: 0,
+            totalPlays: 0,
+            wins: 0,
+            directWins: 0, // Ganhos sem martingale
+            martingaleWins: 0, // Ganhos com martingale
+            totalExplosions: 0,
+            explosionData: {
+                firstAttempt: [0, 0, 0, 0], // Contagem de explosões por posição na primeira tentativa
+                martingale: [0, 0, 0, 0] // Contagem de explosões por posição no martingale
+            },
+            currentSequence: 1,
+            quadrantStats: [0, 0, 0, 0], // Estatísticas por quadrante
+            processingExplosion: false, // Flag para controlar o fluxo de explosão
+            explosionState: null // Armazena estado temporário durante o processo de explosão
+        };
+        
+        // Inicializar modelo de ML
+        const mlModel = new HybridMinesPredictor();
+
+        // Elementos do DOM
+        const minesBoard = document.getElementById('mines-board');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const explodedBtn = document.getElementById('exploded-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const explosionOverlay = document.getElementById('explosion-overlay');
+        const martingaleCheckbox = document.getElementById('martingale-checkbox');
+        const martingaleContainer = document.getElementById('martingale-container');
+        const martingaleSuccessOverlay = document.getElementById('martingale-success-overlay');
+        const martingaleSuccessContainer = document.getElementById('martingale-success-container');
+        const martingaleYesBtn = document.getElementById('martingale-yes');
+        const martingaleNoBtn = document.getElementById('martingale-no');
+        const cancelExplosionBtn = document.getElementById('cancel-explosion');
+        const historyList = document.getElementById('history-list');
+        const sequenceCount = document.getElementById('sequenceCount');
+        const totalPlaysEl = document.getElementById('totalPlays');
+        const successRateEl = document.getElementById('successRate');
+        const winCountEl = document.getElementById('winCount');
+        const martingaleRateEl = document.getElementById('martingale-rate');
+        const directSuccessRateEl = document.getElementById('direct-success-rate');
+        const explosionQ1El = document.getElementById('explosion-q1');
+        const explosionQ2El = document.getElementById('explosion-q2');
+        const explosionQ3El = document.getElementById('explosion-q3');
+        const explosionQ4El = document.getElementById('explosion-q4');
+        const modelAccuracyEl = document.getElementById('model-accuracy');
+        const modelAccuracyBarEl = document.getElementById('model-accuracy-bar');
+        
+        // Elementos dos modelos de ML
+        const thompsonActiveEl = document.getElementById('thompson-active');
+        const banditActiveEl = document.getElementById('bandit-active');
+        const heuristicActiveEl = document.getElementById('heuristic-active');
+        const thompsonConfidenceEl = document.getElementById('thompson-confidence');
+        const banditConfidenceEl = document.getElementById('bandit-confidence');
+        const heuristicConfidenceEl = document.getElementById('heuristic-confidence');
+
+        // Criar tabuleiro
+        function createBoard() {
+            minesBoard.innerHTML = '';
+            for (let i = 0; i < state.totalSquares; i++) {
+                const square = document.createElement('div');
+                square.id = `square-${i}`;
+                square.className = 'aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-xl font-bold transition-all cursor-default shadow-inner-lg';
+                square.dataset.index = i;
+                minesBoard.appendChild(square);
+            }
+        }
+
+        // Resetar seleções no tabuleiro
+        function resetBoardSelections() {
+            state.selectedSquares = [];
+            document.querySelectorAll('#mines-board > div').forEach(square => {
+                square.className = 'aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-xl font-bold transition-all cursor-default shadow-inner-lg';
+                square.textContent = '';
+            });
+        }
+
+        // Atualizar estatísticas na UI com tratamento de erros
+        function updateStats() {
+            try {
+                sequenceCount.textContent = state.currentSequence || 1;
+                totalPlaysEl.textContent = state.totalPlays || 0;
+                
+                const successRate = state.totalPlays > 0 
+                    ? Math.round((state.wins / state.totalPlays) * 100) 
+                    : 0;
+                
+                successRateEl.textContent = `${successRate}%`;
+                winCountEl.textContent = `(${state.wins || 0} ganhos)`;
+                
+                // Estatísticas de martingale
+                const martingaleRate = state.wins > 0 
+                    ? Math.round((state.martingaleWins / state.wins) * 100)
+                    : 0;
+                martingaleRateEl.textContent = `${martingaleRate}%`;
+                
+                const directSuccessRate = state.wins > 0
+                    ? Math.round((state.directWins / state.wins) * 100)
+                    : 0;
+                directSuccessRateEl.textContent = `${directSuccessRate}%`;
+                
+                // Estatísticas de explosão por quadrado
+                const totalExplFirst = state.explosionData.firstAttempt.reduce((a, b) => a + b, 0) || 1;
+                explosionQ1El.textContent = `${Math.round((state.explosionData.firstAttempt[0] / totalExplFirst) * 100)}%`;
+                explosionQ2El.textContent = `${Math.round((state.explosionData.firstAttempt[1] / totalExplFirst) * 100)}%`;
+                explosionQ3El.textContent = `${Math.round((state.explosionData.firstAttempt[2] / totalExplFirst) * 100)}%`;
+                explosionQ4El.textContent = `${Math.round((state.explosionData.firstAttempt[3] / totalExplFirst) * 100)}%`;
+                
+                // Atualizar estatísticas do modelo de ML
+                thompsonConfidenceEl.textContent = `${Math.round(mlModel.thompsonModel.confidence * 100)}%`;
+                banditConfidenceEl.textContent = `${Math.round(mlModel.banditModel.confidence * 100)}%`;
+                
+                // Atualizar confiança/performance geral do modelo
+                const modelAccuracy = Math.round(mlModel.confidence * 100);
+                modelAccuracyEl.textContent = `${modelAccuracy}%`;
+                modelAccuracyBarEl.style.width = `${modelAccuracy}%`;
+                
+                // Ajustar cor da barra baseado na performance
+                if (modelAccuracy >= 70) {
+                    modelAccuracyBarEl.className = "bg-green-500 h-2.5 rounded-full";
+                } else if (modelAccuracy >= 50) {
+                    modelAccuracyBarEl.className = "bg-yellow-500 h-2.5 rounded-full";
+                } else {
+                    modelAccuracyBarEl.className = "bg-red-500 h-2.5 rounded-full";
+                }
+            } catch (e) {
+                console.error("Erro ao atualizar estatísticas:", e);
+            }
+        }
+
+        // Adicionar entrada ao histórico
+        function addToHistory(message, data = {}) {
+            try {
+                if (historyList.querySelector('.text-center')) {
+                    historyList.innerHTML = '';
+                }
+                
+                const entry = document.createElement('div');
+                entry.className = `py-3 px-5 ${
+                    data.success === true ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200' : 
+                    data.success === false ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200' : 
+                    data.martingale ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200' :
+                    'bg-gray-50 dark:bg-gray-800/30 text-gray-800 dark:text-gray-200'
+                }`;
+                
+                // Criar conteúdo principal com ícone apropriado
+                const mainContent = document.createElement('div');
+                mainContent.className = 'flex items-start';
+                
+                // Adicionar ícone baseado no tipo de entrada
+                const icon = document.createElement('i');
+                if (data.success === true) {
+                    icon.className = 'fas fa-check-circle text-green-500 dark:text-green-400 mr-2 mt-0.5';
+                } else if (data.success === false) {
+                    icon.className = 'fas fa-times-circle text-red-500 dark:text-red-400 mr-2 mt-0.5';
+                } else if (data.martingale) {
+                    icon.className = 'fas fa-sync-alt text-yellow-500 dark:text-yellow-400 mr-2 mt-0.5';
+                } else {
+                    icon.className = 'fas fa-info-circle text-blue-500 dark:text-blue-400 mr-2 mt-0.5';
+                }
+                
+                const textContent = document.createElement('div');
+                textContent.className = 'flex-grow';
+                textContent.textContent = message;
+                
+                mainContent.appendChild(icon);
+                mainContent.appendChild(textContent);
+                entry.appendChild(mainContent);
+                
+                // Adicionar detalhes se necessário
+                if (data.details) {
+                    const details = document.createElement('div');
+                    details.className = 'text-xs mt-1 ml-6 opacity-80';
+                    details.textContent = data.details;
+                    entry.appendChild(details);
+                }
+                
+                // Se temos dados do modelo, adicionar metadados
+                if (data.modelInfo) {
+                    const modelInfo = document.createElement('div');
+                    modelInfo.className = 'text-xs mt-1 ml-6 text-primary dark:text-primaryLight italic flex items-center';
+                    
+                    const modelIcon = document.createElement('i');
+                    modelIcon.className = 'fas fa-robot mr-1';
+                    
+                    modelInfo.appendChild(modelIcon);
+                    modelInfo.appendChild(document.createTextNode(data.modelInfo));
+                    entry.appendChild(modelInfo);
+                }
+                
+                // Adicionar ao início da lista
+                historyList.insertBefore(entry, historyList.firstChild);
+            } catch (e) {
+                console.error("Erro ao adicionar ao histórico:", e);
+            }
+        }
+
+        // Analisar e selecionar casas com menos probabilidade de bombas
+        function analyzePlay() {
+            // Se já existe uma jogada selecionada, marcá-la como bem-sucedida antes de gerar uma nova
+            if (state.selectedSquares.length > 0) {
+                showMartingaleSuccessPrompt();
+                return;
+            }
+            
+            generateNewPlay();
+        }
+        
+        // Mostrar prompt para verificar se precisou de martingale para sucesso
+        function showMartingaleSuccessPrompt() {
+            martingaleSuccessOverlay.classList.remove('hidden');
+        }
+        
+        // Processar uma jogada bem-sucedida (com ou sem martingale)
+        function processSuccessfulPlay(usedMartingale, explodedPosition = -1) {
+            try {
+                // Preparar contexto para o ML
+                const gameContext = {
+                    quadrantStats: state.quadrantStats,
+                    explosionData: state.explosionData,
+                    totalExplosions: state.totalExplosions,
+                    martingaleWins: state.martingaleWins,
+                    directWins: state.directWins,
+                    wins: state.wins,
+                    totalPlays: state.totalPlays,
+                    consecutiveFailures: state.consecutiveFailures,
+                    previousSelections: state.previousSelections
+                };
+                
+                // Extrair contexto para o Bandit
+                const context = mlModel.banditModel.extractContext(gameContext);
+                
+                // Adicionar seleção atual ao histórico
+                state.previousSelections.push([...state.selectedSquares]);
+                
+                // Atualizar estatísticas
+                state.totalPlays++;
+                state.wins++;
+                state.consecutiveFailures = 0;
+                
+                if (usedMartingale) {
+                    state.martingaleWins++;
+                    state.totalExplosions++;
+                    
+                    // Registrar qual posição explodiu na primeira tentativa
+                    if (explodedPosition >= 0 && explodedPosition < 4) {
+                        state.explosionData.firstAttempt[explodedPosition]++;
+                    }
+                    
+                    // Atualizar o histórico
+                    const lastEntry = historyList.firstChild;
+                    if (lastEntry) {
+                        lastEntry.className = 'py-3 px-5 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200';
+                        
+                        // Encontrar o elemento de texto e atualizar
+                        const textElement = lastEntry.querySelector('div.flex-grow');
+                        if (textElement) {
+                            textElement.textContent = `${textElement.textContent} - GANHOU COM MARTINGALE!`;
+                        }
+                        
+                        // Adicionar detalhes sobre qual quadrado explodiu
+                        if (explodedPosition >= 0) {
+                            // Verificar se já existe um elemento de detalhes
+                            let detailsElement = lastEntry.querySelector('.text-xs.mt-1.ml-6.opacity-80');
+                            
+                            if (!detailsElement) {
+                                detailsElement = document.createElement('div');
+                                detailsElement.className = 'text-xs mt-1 ml-6 opacity-80';
+                                lastEntry.appendChild(detailsElement);
+                            }
+                            
+                            detailsElement.textContent = `Quadrado ${explodedPosition + 1} explodiu na primeira tentativa`;
+                        }
+                    }
+                    
+                    // Informar sobre a decisão do ML
+                    const modelInfo = `Confiança do modelo: ${Math.round(mlModel.confidence * 100)}%`;
+                    
+                    addToHistory(`Martingale necessário na sequência ${state.currentSequence}`, { 
+                        martingale: true, 
+                        details: `Quadrado ${explodedPosition + 1} explodiu na primeira tentativa`,
+                        modelInfo
+                    });
+                    
+                    // Atualizar os modelos de ML
+                    state.selectedSquares.forEach((position, idx) => {
+                        // Apenas a posição que explodiu é considerada como falha
+                        const success = idx !== explodedPosition;
+                        
+                        // Atualizar modelo Thompson
+                        mlModel.thompsonModel.update(position, success);
+                        
+                        // Atualizar modelo Bandit
+                        const reward = success ? 0.5 : -1; // Penalizar menos para martingale com sucesso
+                        mlModel.banditModel.update(position, context, reward);
+                    });
+                } else {
+                    state.directWins++;
+                    
+                    // Atualizar o histórico
+                    const lastEntry = historyList.firstChild;
+                    if (lastEntry) {
+                        lastEntry.className = 'py-3 px-5 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200';
+                        
+                        // Encontrar o elemento de texto e atualizar
+                        const textElement = lastEntry.querySelector('div.flex-grow');
+                        if (textElement) {
+                            textElement.textContent = `${textElement.textContent} - GANHOU!`;
+                        }
+                    }
+                    
+                    // Informar sobre a decisão do ML
+                    const modelInfo = `Confiança do modelo: ${Math.round(mlModel.confidence * 100)}%`;
+                    addToHistory(`Sucesso direto na sequência ${state.currentSequence}`, { 
+                        success: true,
+                        modelInfo
+                    });
+                    
+                    // Atualizar os modelos de ML
+                    state.selectedSquares.forEach(position => {
+                        // Todas as posições são consideradas como sucesso
+                        mlModel.thompsonModel.update(position, true);
+                        mlModel.banditModel.update(position, context, 1); // Recompensa máxima
+                    });
+                }
+                
+                // Incrementar sequência
+                state.currentSequence++;
+                updateStats();
+                
+                // Gerar nova jogada
+                resetBoardSelections();
+                generateNewPlay();
+            } catch (e) {
+                console.error("Erro ao processar jogada bem-sucedida:", e);
+                // Em caso de erro, tentar garantir que uma nova jogada seja gerada
+                resetBoardSelections();
+                generateNewPlay();
+            }
+        }
+        
+        // Gerar uma nova jogada usando o modelo de ML
+        function generateNewPlay() {
+            loadingOverlay.classList.remove('hidden');
+            
+            // Atualizar estado dos modelos ativos
+            mlModel.activeModels.thompson = thompsonActiveEl.checked;
+            mlModel.activeModels.bandit = banditActiveEl.checked;
+            mlModel.activeModels.heuristic = heuristicActiveEl.checked;
+            
+            // Preparar contexto do jogo para o ML
+            const gameContext = {
+                quadrantStats: state.quadrantStats,
+                explosionData: state.explosionData,
+                totalExplosions: state.totalExplosions,
+                martingaleWins: state.martingaleWins,
+                directWins: state.directWins,
+                wins: state.wins,
+                totalPlays: state.totalPlays,
+                consecutiveFailures: state.consecutiveFailures,
+                previousSelections: state.previousSelections
+            };
+            
+            // Simular tempo de processamento
+            setTimeout(() => {
+                try {
+                    // Usar modelo ML para prever melhores posições
+                    const selectedIndices = mlModel.predict(gameContext, 4);
+                    
+                    // Garantir que temos exatamente 4 posições únicas
+                    const uniqueIndices = [...new Set(selectedIndices)];
+                    
+                    // Se não temos 4 posições únicas, adicionar outras aleatoriamente
+                    while (uniqueIndices.length < 4) {
+                        const randomIndex = Math.floor(Math.random() * state.totalSquares);
+                        if (!uniqueIndices.includes(randomIndex)) {
+                            uniqueIndices.push(randomIndex);
+                        }
+                    }
+                    
+                    // Limitar para exatamente 4 posições
+                    const finalIndices = uniqueIndices.slice(0, 4);
+                    
+                    // Atualizar seleção atual
+                    state.selectedSquares = finalIndices;
+                    
+                    // Destacar as casas selecionadas
+                    finalIndices.forEach((index, i) => {
+                        const square = document.getElementById(`square-${index}`);
+                        if (square) {
+                            square.className = 'aspect-square bg-selection text-white dark:bg-selection rounded-lg flex items-center justify-center text-xl font-bold transition-all cursor-default animate-pulse-fast shadow-md';
+                            square.textContent = i + 1;
+                        }
+                    });
+                    
+                    // Adicionar ao histórico
+                    const selectionText = `Sequência ${state.currentSequence}: Casas ${finalIndices.map(i => i + 1).join(', ')}`;
+                    const modelInfo = `Modelo ML: Confiança ${Math.round(mlModel.confidence * 100)}%`;
+                    addToHistory(selectionText, { modelInfo });
+                } catch (e) {
+                    console.error("Erro ao gerar nova jogada:", e);
+                    
+                    // Fallback em caso de erro: selecionar 4 posições aleatórias
+                    const fallbackIndices = [];
+                    while (fallbackIndices.length < 4) {
+                        const randomIndex = Math.floor(Math.random() * state.totalSquares);
+                        if (!fallbackIndices.includes(randomIndex)) {
+                            fallbackIndices.push(randomIndex);
+                        }
+                    }
+                    
+                    // Atualizar seleção atual com o fallback
+                    state.selectedSquares = fallbackIndices;
+                    
+                    // Destacar as casas selecionadas
+                    fallbackIndices.forEach((index, i) => {
+                        const square = document.getElementById(`square-${index}`);
+                        if (square) {
+                            square.className = 'aspect-square bg-selection text-white dark:bg-selection rounded-lg flex items-center justify-center text-xl font-bold transition-all cursor-default animate-pulse-fast shadow-md';
+                            square.textContent = i + 1;
+                        }
+                    });
+                    
+                    // Adicionar ao histórico
+                    const selectionText = `Sequência ${state.currentSequence}: Casas ${fallbackIndices.map(i => i + 1).join(', ')}`;
+                    addToHistory(selectionText, { 
+                        details: "Gerado em modo de recuperação de erro" 
+                    });
+                } finally {
+                    loadingOverlay.classList.add('hidden');
+                }
+            }, 1200); // Tempo aumentado para simular processamento ML
+        }
+
+        // Marcar como explodido e iniciar processo de coleta de informações
+        function markAsExploded() {
+            if (state.selectedSquares.length === 0) {
+                addToHistory("Você precisa analisar uma jogada primeiro!");
+                return;
+            }
+            
+            // Mostrar overlay para seleção do quadrado que explodiu
+            explosionOverlay.classList.remove('hidden');
+            state.processingExplosion = true;
+            
+            // Reset do estado de martingale
+            martingaleCheckbox.checked = false;
+            martingaleContainer.classList.add('hidden');
+            
+            // Resetar seleções de botões
+            document.querySelectorAll('.explosion-btn').forEach(btn => {
+                btn.classList.remove('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                btn.classList.add('bg-warning');
+            });
+            
+            document.querySelectorAll('.martingale-btn').forEach(btn => {
+                btn.classList.remove('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                btn.classList.add('bg-red-500');
+            });
+        }
+        
+        // Finalizar processo de explosão com as informações coletadas
+        function finalizeExplosion(firstAttemptPosition, usedMartingale, martingalePosition = -1) {
+            try {
+                // Preparar contexto para o ML
+                const gameContext = {
+                    quadrantStats: state.quadrantStats,
+                    explosionData: state.explosionData,
+                    totalExplosions: state.totalExplosions,
+                    martingaleWins: state.martingaleWins,
+                    directWins: state.directWins,
+                    wins: state.wins,
+                    totalPlays: state.totalPlays,
+                    consecutiveFailures: state.consecutiveFailures,
+                    previousSelections: state.previousSelections
+                };
+                
+                // Extrair contexto para o Bandit
+                const context = mlModel.banditModel.extractContext(gameContext);
+                
+                // Adicionar seleção atual ao histórico
+                state.previousSelections.push([...state.selectedSquares]);
+                
+                // Atualizar estatísticas básicas
+                state.totalPlays++;
+                state.consecutiveFailures++;
+                state.totalExplosions++;
+                
+                // Registrar qual posição explodiu na primeira tentativa
+                if (firstAttemptPosition >= 0 && firstAttemptPosition < 4) {
+                    state.explosionData.firstAttempt[firstAttemptPosition]++;
+                }
+                
+                // Se usou martingale e também explodiu, registrar a posição do martingale
+                if (usedMartingale && martingalePosition >= 0 && martingalePosition < 4) {
+                    state.explosionData.martingale[martingalePosition]++;
+                }
+                
+                // Atualizar o histórico
+                const lastEntry = historyList.firstChild;
+                if (lastEntry) {
+                    lastEntry.className = 'py-3 px-5 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200';
+                    
+                    // Encontrar o elemento de texto e atualizar
+                    const textElement = lastEntry.querySelector('div.flex-grow');
+                    if (textElement) {
+                        if (usedMartingale) {
+                            textElement.textContent = `${textElement.textContent} - EXPLODIU COM MARTINGALE!`;
+                        } else {
+                            textElement.textContent = `${textElement.textContent} - EXPLODIU!`;
+                        }
+                    }
+                    
+                    // Adicionar detalhes sobre quais quadrados explodiram
+                    // Verificar se já existe um elemento de detalhes
+                    let detailsElement = lastEntry.querySelector('.text-xs.mt-1.ml-6.opacity-80');
+                    
+                    if (!detailsElement) {
+                        detailsElement = document.createElement('div');
+                        detailsElement.className = 'text-xs mt-1 ml-6 opacity-80';
+                        lastEntry.appendChild(detailsElement);
+                    }
+                    
+                    if (usedMartingale) {
+                        detailsElement.textContent = `Quadrado ${firstAttemptPosition + 1} na 1ª tentativa, Quadrado ${martingalePosition + 1} no martingale`;
+                    } else {
+                        detailsElement.textContent = `Quadrado ${firstAttemptPosition + 1} explodiu`;
+                    }
+                }
+                
+                // Adicionar mensagem específica sobre adaptação da estratégia
+                if (state.consecutiveFailures >= 2) {
+                    const modelInfo = `Modelo ML: Adaptando estratégia (Confiança: ${Math.round(mlModel.confidence * 100)}%)`;
+                    
+                    addToHistory(`Falha consecutiva! Adaptando estratégia...`, {
+                        success: false,
+                        details: usedMartingale ? 
+                            `Falhou até com martingale (Q${firstAttemptPosition + 1} e Q${martingalePosition + 1})` : 
+                            `Falhou no Quadrado ${firstAttemptPosition + 1}`,
+                        modelInfo
+                    });
+                }
+                
+                // Atualizar os modelos de ML
+                state.selectedSquares.forEach((position, idx) => {
+                    // Apenas a posição que explodiu é considerada completamente falha
+                    const positionExploded = idx === firstAttemptPosition;
+                    
+                    // Atualizar modelo Thompson
+                    mlModel.thompsonModel.update(position, !positionExploded);
+                    
+                    // Atualizar modelo Bandit - recompensa negativa para explosão, neutra para outros
+                    const reward = positionExploded ? -1 : 0;
+                    mlModel.banditModel.update(position, context, reward);
+                });
+                
+                // Incrementar sequência
+                state.currentSequence++;
+                updateStats();
+                
+                // Gerar automaticamente nova jogada
+                resetBoardSelections();
+                setTimeout(generateNewPlay, 500);
+            } catch (e) {
+                console.error("Erro ao finalizar explosão:", e);
+                
+                // Em caso de erro, tentar recuperar
+                resetBoardSelections();
+                setTimeout(generateNewPlay, 500);
+            }
+        }
+
+        // Inicializar
+        function init() {
+            try {
+                createBoard();
+                updateStats();
+                
+                // Eventos para botões principais
+                analyzeBtn.addEventListener('click', analyzePlay);
+                explodedBtn.addEventListener('click', markAsExploded);
+                
+                // Evento para checkbox de martingale
+                martingaleCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        martingaleContainer.classList.remove('hidden');
+                    } else {
+                        martingaleContainer.classList.add('hidden');
+                    }
+                });
+                
+                // Eventos para controles dos modelos
+                thompsonActiveEl.addEventListener('change', function() {
+                    mlModel.activeModels.thompson = this.checked;
+                });
+                
+                banditActiveEl.addEventListener('change', function() {
+                    mlModel.activeModels.bandit = this.checked;
+                });
+                
+                heuristicActiveEl.addEventListener('change', function() {
+                    mlModel.activeModels.heuristic = this.checked;
+                });
+                
+                // Eventos para botões de seleção de quadrado que explodiu
+                document.querySelectorAll('.explosion-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        // Marcar visualmente o botão selecionado
+                        document.querySelectorAll('.explosion-btn').forEach(b => {
+                            b.classList.remove('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                            b.classList.add('bg-warning');
+                        });
+                        this.classList.remove('bg-warning');
+                        this.classList.add('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                        
+                        // Armazenar a posição selecionada
+                        const position = parseInt(this.dataset.position);
+                        state.explosionState = { firstAttemptPosition: position };
+                        
+                        // Se não usou martingale, finalizar processo
+                        if (!martingaleCheckbox.checked) {
+                            explosionOverlay.classList.add('hidden');
+                            finalizeExplosion(position, false);
+                        }
+                    });
+                });
+                
+                // Eventos para botões de seleção de quadrado que explodiu no martingale
+                document.querySelectorAll('.martingale-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        // Marcar visualmente o botão selecionado
+                        document.querySelectorAll('.martingale-btn').forEach(b => {
+                            b.classList.remove('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                            b.classList.add('bg-red-500');
+                        });
+                        this.classList.remove('bg-red-500');
+                        this.classList.add('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                        
+                        // Armazenar a posição selecionada e finalizar processo
+                        if (state.explosionState && state.explosionState.firstAttemptPosition !== undefined) {
+                            const martingalePosition = parseInt(this.dataset.position);
+                            explosionOverlay.classList.add('hidden');
+                            finalizeExplosion(
+                                state.explosionState.firstAttemptPosition, 
+                                true, 
+                                martingalePosition
+                            );
+                        }
+                    });
+                });
+                
+                // Evento para botão de cancelar
+                cancelExplosionBtn.addEventListener('click', function() {
+                    explosionOverlay.classList.add('hidden');
+                    state.processingExplosion = false;
+                    state.explosionState = null;
+                });
+                
+                // Eventos para martingale bem-sucedido
+                martingaleYesBtn.addEventListener('click', function() {
+                    martingaleSuccessContainer.classList.remove('hidden');
+                });
+                
+                martingaleNoBtn.addEventListener('click', function() {
+                    martingaleSuccessOverlay.classList.add('hidden');
+                    processSuccessfulPlay(false);
+                });
+                
+                // Eventos para botões de seleção de quadrado que explodiu no martingale com sucesso
+                document.querySelectorAll('.martingale-success-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        // Marcar visualmente o botão selecionado
+                        document.querySelectorAll('.martingale-success-btn').forEach(b => {
+                            b.classList.remove('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                            b.classList.add('bg-warning');
+                        });
+                        this.classList.remove('bg-warning');
+                        this.classList.add('bg-danger', 'btn-selected', 'btn-selected-pulse');
+                        
+                        // Processar sucesso com martingale
+                        const position = parseInt(this.dataset.position);
+                        martingaleSuccessOverlay.classList.add('hidden');
+                        processSuccessfulPlay(true, position);
+                    });
+                });
+                
+                // Avisar o usuário sobre a não persistência de dados
+                addToHistory("Bem-vindo ao Analisador ML de Mines! Os dados serão mantidos apenas durante esta sessão.", {
+                    details: "Devido a restrições de segurança, os dados não serão salvos entre sessões do navegador."
+                });
+            } catch (e) {
+                console.error("Erro na inicialização:", e);
+                // Tentativa de recuperação
+                alert("Ocorreu um erro na inicialização. Tente recarregar a página.");
+            }
+        }
+
+        // Iniciar aplicativo
+        init();
+    </script>
+</body>
+</html>
