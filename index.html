@@ -98,17 +98,6 @@
 
         <!-- Corpo Principal -->
         <main class="flex-grow flex flex-col items-center">
-            <!-- Formulário de login -->
-<form id="login-form" class="p-4 max-w-sm mx-auto bg-white shadow rounded">
-  <h2 class="text-xl font-bold mb-4">Login</h2>
-  <label for="email" class="block mb-2">Email:</label>
-  <input type="email" id="email" class="border rounded p-2 w-full mb-4" required>
-  <label for="senha" class="block mb-2">Senha:</label>
-  <input type="password" id="senha" class="border rounded p-2 w-full mb-4" required>
-  <button type="submit" class="bg-blue-500 text-white rounded px-4 py-2 hover:bg-blue-600">
-    Entrar
-  </button>
-</form>
             <!-- Configurações -->
             <div class="w-full bg-white dark:bg-darkCard rounded-xl shadow-md dark:shadow-elevated-dark overflow-hidden transition-all mb-6">
                 <div class="bg-gray-50 dark:bg-gray-800/30 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -1745,62 +1734,6 @@
         init();
             }
   }
-  const SHEET_ID = "1RLyYB6laecNnwaOmKuj6d_kcamKzP1_FIJ4AYC_BOnk"; // Substitua pelo ID da sua planilha
-  const API_KEY = "AIzaSyCauTL_CvDiEta8NHWd1vVne-5FHBskPv4"; // Substitua pela sua chave de API
-  const SHEET_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?ranges=A1:D&key=${API_KEY}`;
-
-  // Função para carregar dados da planilha
-  async function loadUserData() {
-    try {
-      const response = await fetch(SHEET_URL);
-      const data = await response.json();
-      const rows = data.valueRanges[0].values;
-
-      // Transformar os dados em um array de objetos
-      const users = rows.slice(1).map(row => ({
-        nome: row[0],
-        email: row[1],
-        senha: row[2],
-        status: row[3]
-      }));
-
-      console.log("Usuários carregados:", users);
-      return users;
-    } catch (error) {
-      console.error("Erro ao carregar dados da planilha:", error);
-    }
-  }
-
-  // Função para verificar login
-  async function login(email, senha) {
-    const users = await loadUserData();
-
-    // Verificar se o usuário existe e se a senha está correta
-    const user = users.find(user => user.email === email && user.senha === senha);
-
-    if (user) {
-      if (user.status === "Pago") {
-        alert(`Bem-vindo, ${user.nome}!`);
-      } else {
-        alert("Seu pagamento ainda não foi confirmado.");
-      }
-    } else {
-      alert("Email ou senha incorretos.");
-    }
-  }
-
-  // Exemplo de envio de formulário de login
-  document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("login-form");
-    form.addEventListener("submit", event => {
-      event.preventDefault();
-
-      const email = form.querySelector("#email").value;
-      const senha = form.querySelector("#senha").value;
-
-      login(email, senha);
-    });
-  });
     </script>
 </body>
 </html>
